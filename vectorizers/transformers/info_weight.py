@@ -136,7 +136,7 @@ def column_group_baseline_probabilities(
     return probabilities
 
 
-#@numba.njit(nogil=True, parallel=True)
+@numba.njit(nogil=True, parallel=True)
 def grouped_column_weights(
     indptr,
     indices,
@@ -224,7 +224,7 @@ def information_weight(
 
     single_column_group_weight ndarray or None (optional, default=None)
         Flag whether each column group should be force to have a single information weight.
-        If cols_groups is passed and this is not, default to True for each group.
+        If cols_groups is passed and this is not, default to False for each group.
 
     Returns
     -------
@@ -260,7 +260,7 @@ def information_weight(
 
     if column_groups is not None:
         if single_column_group_weight is None:
-            single_column_group_weight = np.ones(column_groups.max()+1, dtype=np.bool)
+            single_column_group_weight = np.zeros(column_groups.max()+1, dtype=np.bool)
         weights = grouped_column_weights(
             csc_data.indptr,
             csc_data.indices,
@@ -331,7 +331,7 @@ class InformationWeightTransformer(BaseEstimator, TransformerMixin):
         self.weight_power = weight_power
         self.supervision_weight = supervision_weight
 
-    def fit(self, X, y=None, **fit_kwds):
+    def fit(self, X, y=None, column_groups=None, single_column_group_weight=None, **fit_kwds):
         """Learn the appropriate column weighting as information weights
         from the observed count data ``X``.
 
@@ -350,7 +350,11 @@ class InformationWeightTransformer(BaseEstimator, TransformerMixin):
             X = scipy.sparse.csc_matrix(X)
 
         self.information_weights_ = information_weight(
-            X, self.prior_strength, self.approx_prior
+            X,
+            self.prior_strength,
+            self.approx_prior,
+            column_groups=column_groups,
+            single_column_group_weight=single_column_group_weight,
         )
 
         if y is not None:
