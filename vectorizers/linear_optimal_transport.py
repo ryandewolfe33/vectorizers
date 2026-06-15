@@ -1471,7 +1471,7 @@ class WassersteinVectorizer(BaseEstimator, TransformerMixin):
         we are treating input rows as distributions. Values between 0.0 and 1.0 will give
         greater weight to unnormalized distributions with larger values. A value of 0.5
         or 0.66 may be useful, for example, in document embeddings where document length
-        should have some ipact on the resulting embedding.
+        should have some impact on the resulting embedding.
 
     sinkhorn_chunk_size: int (optional, default=32)
         Only used for method='LOT_sinkhorn'.
@@ -2583,7 +2583,7 @@ class ApproximateWassersteinVectorizer(BaseEstimator, TransformerMixin):
        we are treating input rows as distributions. Values between 0.0 and 1.0 will give
        greater weight to unnormalized distributions with larger values. A value of 0.5
        or 0.66 may be useful, for example, in document embeddings where document length
-       should have some ipact on the resulting embedding.
+       should have some impact on the resulting embedding.
 
     n_svd_iter: int (optional, default=10)
         How many iterations of randomized SVD to run to get compressed vectors. More
