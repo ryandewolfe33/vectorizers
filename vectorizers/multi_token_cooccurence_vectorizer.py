@@ -93,12 +93,12 @@ def numba_build_multi_skip_grams(
                 if not window_reversals[i]:
                     multi_window = token_sequences[
                         d_i : min(
-                            [len(token_sequences), d_i + window_size_array[i, 0] + 1]
+                            [len(token_sequences), d_i + window_size_array[i, target_word] + 1]
                         )
                     ]
                 else:
                     multi_window = token_sequences[
-                        max([0, d_i - window_size_array[i, 0]]) : d_i + 1
+                        max([0, d_i - window_size_array[i, target_word]]) : d_i + 1
                     ]
                     multi_window.reverse()
 
@@ -133,7 +133,7 @@ def numba_build_multi_skip_grams(
                         row = target_word
                         col = context + i * n_unique_tokens
                         key = col + array_mul * row
-                        coo_append(coo_data[i], (row, col, val, key))
+                        coo_data[i] = coo_append(coo_data[i], (row, col, val, key))
 
     for coo in coo_data:
         coo_sum_duplicates(coo)
@@ -211,12 +211,12 @@ def numba_multi_em_cooccurrence_iteration(
                 if not window_reversals[i]:
                     multi_window = token_sequences[
                         d_i : min(
-                            [len(token_sequences), d_i + window_size_array[i, 0] + 1]
+                            [len(token_sequences), d_i + window_size_array[i, target_word] + 1]
                         )
                     ]
                 else:
                     multi_window = token_sequences[
-                        max([0, d_i - window_size_array[i, 0]]) : d_i + 1
+                        max([0, d_i - window_size_array[i, target_word]]) : d_i + 1
                     ]
                     multi_window.reverse()
 
