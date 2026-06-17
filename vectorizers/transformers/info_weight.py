@@ -6,11 +6,6 @@ import scipy.sparse
 MOCK_TARGET = np.ones(1, dtype=np.int64)
 MOCK_BOOL = np.ones(1, dtype=np.bool)
 
-# TODO Method to run IWT on subsets of columns individually
-# As long as the subset is a cohesive unit, should be the same math
-# i.e. Categorical variable, Text counts
-
-# Multi-select variable -> what to do
 
 @numba.njit(nogil=True)
 def column_kl_divergence_exact_prior(
@@ -159,7 +154,6 @@ def grouped_column_weights(
             prior_strength=prior_strength,
             target=target,
         )
-
     for group, single_weight in enumerate(single_column_group_weight):
         if not single_weight:
             continue
@@ -171,7 +165,6 @@ def grouped_column_weights(
         column_probabilities = column_counts / np.sum(column_counts)
         group_weight = np.sum(weights[group_columns] * column_probabilities)
         weights[group_columns] = group_weight
-
     return weights
 
 
@@ -207,7 +200,7 @@ def information_weight(
 
     approximate_prior: bool (optional, default=False)
         Whether to approximate weights based on the Bayesian prior or perform
-        exact computations. Approximations are much faster especialyl for very
+        exact computations. Approximations are much faster especially for very
         large or very sparse datasets.
 
     target: ndarray or None (optional, default=None)
@@ -308,7 +301,7 @@ class InformationWeightTransformer(BaseEstimator, TransformerMixin):
 
     approximate_prior: bool (optional, default=False)
         Whether to approximate weights based on the Bayesian prior or perform
-        exact computations. Approximations are much faster especialyl for very
+        exact computations. Approximations are much faster especially for very
         large or very sparse datasets.
 
     Attributes
