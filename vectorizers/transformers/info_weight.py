@@ -4,6 +4,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 import scipy.sparse
 
 MOCK_TARGET = np.ones(1, dtype=np.int64)
+MOCK_BOOL = np.ones(1, dtype=np.bool)
 
 
 @numba.njit(nogil=True)
@@ -97,6 +98,8 @@ def column_weights(
     column_kl_divergence_func,
     prior_strength=0.1,
     target=MOCK_TARGET,
+    column_groups=MOCK_TARGET,
+    single_column_group_weight=MOCK_BOOL,
 ):
     n_cols = indptr.shape[0] - 1
     weights = np.ones(n_cols)
@@ -111,7 +114,68 @@ def column_weights(
     return weights
 
 
-def information_weight(data, prior_strength=0.1, approximate_prior=False, target=None):
+@numba.njit(nogil=True, parallel=True)
+def column_group_baseline_probabilities(
+    indptr,
+    indices,
+    data,
+    column_groups,
+):
+    counts = np.zeros((column_groups.max()+1, indptr.shape[0]-1), dtype=np.int64)
+    for row in numba.prange(counts.shape[1]):
+        for i in range(indptr[row], indptr[row+1]):
+            col = indices[i]
+            column_group = column_groups[col]
+            counts[column_group, row] += 1
+    probabilities = counts / np.sum(counts, axis=1).reshape(-1, 1)
+    return probabilities
+
+
+@numba.njit(nogil=True, parallel=True)
+def grouped_column_weights(
+    indptr,
+    indices,
+    data,
+    baseline_probabilities,
+    column_kl_divergence_func,
+    prior_strength=0.1,
+    target=MOCK_TARGET,
+    column_groups=MOCK_TARGET,
+    single_column_group_weight=MOCK_BOOL,
+):
+    n_cols = indptr.shape[0] - 1
+    weights = np.ones(n_cols)
+    for i in numba.prange(n_cols):
+        group = column_groups[i]
+        weights[i] = column_kl_divergence_func(
+            indices[indptr[i] : indptr[i + 1]],
+            data[indptr[i] : indptr[i + 1]],
+            baseline_probabilities[group, :],
+            prior_strength=prior_strength,
+            target=target,
+        )
+    for group, single_weight in enumerate(single_column_group_weight):
+        if not single_weight:
+            continue
+        group_columns = np.where(column_groups == group)[0]
+        column_counts = np.zeros_like(group_columns)
+        for i in range(column_counts.shape[0]):
+            column = group_columns[i]
+            column_counts[i] = np.sum(data[indptr[column]:indptr[column+1]])
+        column_probabilities = column_counts / np.sum(column_counts)
+        group_weight = np.sum(weights[group_columns] * column_probabilities)
+        weights[group_columns] = group_weight
+    return weights
+
+
+def information_weight(
+    data,
+    prior_strength=0.1,
+    approximate_prior=False,
+    target=None,
+    column_groups=None,
+    single_column_group_weight=None,
+):
     """Compute information based weights for columns. The information weight
     is estimated as the amount of information gained by moving from a baseline
     model to a model derived from the observed counts. In practice this can be
@@ -136,13 +200,24 @@ def information_weight(data, prior_strength=0.1, approximate_prior=False, target
 
     approximate_prior: bool (optional, default=False)
         Whether to approximate weights based on the Bayesian prior or perform
-        exact computations. Approximations are much faster especialyl for very
+        exact computations. Approximations are much faster especially for very
         large or very sparse datasets.
 
     target: ndarray or None (optional, default=None)
         If supervised target labels are available, these can be used to define distributions
         over the target classes rather than over rows, allowing weights to be
         supervised and target based. If None then unsupervised weighting is used.
+
+    column_groups: ndarray or None (optional, default=None)
+        If columns have a natural grouping, i.e. cols 10-15 are a one-hot-encoding of a single
+        categorical variable, we can force these columns to have a single information weight
+        corresponding to the expected information gained from observing this categorical. If
+        None then all columns have the same group. Groups must be labelled 0-n without gaps
+        and the next parameter may be passed.
+
+    single_column_group_weight ndarray or None (optional, default=None)
+        Flag whether each column group should be force to have a single information weight.
+        If cols_groups is passed and this is not, default to False for each group.
 
     Returns
     -------
@@ -156,27 +231,52 @@ def information_weight(data, prior_strength=0.1, approximate_prior=False, target
         column_kl_divergence_func = column_kl_divergence_exact_prior
 
     baseline_counts = np.squeeze(np.array(data.sum(axis=1)))
-    if target is None:
-        baseline_probabilities = baseline_counts / baseline_counts.sum()
-    else:
+    if target is not None:
         baseline_probabilities = np.zeros(target.max() + 1)
         for i in range(baseline_probabilities.shape[0]):
             baseline_probabilities[i] = baseline_counts[target == i].sum()
         baseline_probabilities /= baseline_probabilities.sum()
         column_kl_divergence_func = supervised_column_kl
+    elif column_groups is not None:
+        csr_data = data.tocsr()
+        baseline_probabilities = column_group_baseline_probabilities(
+            csr_data.indptr,
+            csr_data.indices,
+            csr_data.data,
+            column_groups
+        )
+    else:
+        baseline_probabilities = baseline_counts / baseline_counts.sum()
 
     csc_data = data.tocsc()
     csc_data.sort_indices()
 
-    weights = column_weights(
-        csc_data.indptr,
-        csc_data.indices,
-        csc_data.data,
-        baseline_probabilities,
-        column_kl_divergence_func,
-        prior_strength=prior_strength,
-        target=target,
-    )
+    if column_groups is not None:
+        if single_column_group_weight is None:
+            single_column_group_weight = np.zeros(column_groups.max()+1, dtype=np.bool)
+        weights = grouped_column_weights(
+            csc_data.indptr,
+            csc_data.indices,
+            csc_data.data,
+            baseline_probabilities,
+            column_kl_divergence_func,
+            prior_strength=prior_strength,
+            target=target,
+            column_groups=column_groups,
+            single_column_group_weight=single_column_group_weight,
+        )
+    else:
+        weights = column_weights(
+            csc_data.indptr,
+            csc_data.indices,
+            csc_data.data,
+            baseline_probabilities,
+            column_kl_divergence_func,
+            prior_strength=prior_strength,
+            target=target,
+            column_groups=column_groups,
+            single_column_group_weight=single_column_group_weight,
+        )
     return weights
 
 
@@ -201,7 +301,7 @@ class InformationWeightTransformer(BaseEstimator, TransformerMixin):
 
     approximate_prior: bool (optional, default=False)
         Whether to approximate weights based on the Bayesian prior or perform
-        exact computations. Approximations are much faster especialyl for very
+        exact computations. Approximations are much faster especially for very
         large or very sparse datasets.
 
     Attributes
@@ -224,7 +324,7 @@ class InformationWeightTransformer(BaseEstimator, TransformerMixin):
         self.weight_power = weight_power
         self.supervision_weight = supervision_weight
 
-    def fit(self, X, y=None, **fit_kwds):
+    def fit(self, X, y=None, column_groups=None, single_column_group_weight=None, **fit_kwds):
         """Learn the appropriate column weighting as information weights
         from the observed count data ``X``.
 
@@ -243,7 +343,11 @@ class InformationWeightTransformer(BaseEstimator, TransformerMixin):
             X = scipy.sparse.csc_matrix(X)
 
         self.information_weights_ = information_weight(
-            X, self.prior_strength, self.approx_prior
+            X,
+            self.prior_strength,
+            self.approx_prior,
+            column_groups=column_groups,
+            single_column_group_weight=single_column_group_weight,
         )
 
         if y is not None:
