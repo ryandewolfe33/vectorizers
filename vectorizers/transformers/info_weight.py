@@ -20,20 +20,19 @@ def column_kl_divergence_exact_prior(
         prior_strength / observed_norm
     )
     result = 0.0
-    count_indices_set = set(count_indices)
+    current_idx = 0
     for i in range(baseline_probabilities.shape[0]):
-        if i in count_indices_set:
-            idx = np.searchsorted(count_indices, i)
+        if count_indices[current_idx] == i:
             observed_probability = (
-                count_data[idx] + prior_strength * baseline_probabilities[i]
+                count_data[current_idx] + prior_strength * baseline_probabilities[i]
             ) / observed_norm
             if observed_probability > 0.0:
                 result += observed_probability * np.log(
                     observed_probability / baseline_probabilities[i]
                 )
+            current_idx += 1
         else:
             result += baseline_probabilities[i] * observed_zero_constant
-
     return result
 
 
