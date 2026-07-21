@@ -198,7 +198,7 @@ def test_iw_transformer(prior_strength):
 
 
 @pytest.mark.parametrize("prior_strength", [0, 0.1])
-@pytest.mark.parametrize("target", [None, np.array([0, 1, 1])])
+@pytest.mark.parametrize("target", [None, np.array([0, 1, 1]), np.array([0, 1, -1])])
 @pytest.mark.parametrize("column_groups", [None, np.array([0, 1, 1])])
 def test_iw_transformer_fit_args(prior_strength, target, column_groups):
     IWT = InformationWeightTransformer(
@@ -212,7 +212,7 @@ def test_iw_transformer_fit_args(prior_strength, target, column_groups):
 
 
 @pytest.mark.parametrize("prior_strength", [0, 0.1])
-@pytest.mark.parametrize("target", [None, np.array([0, 1, 1])])
+@pytest.mark.parametrize("target", [None, np.array([0, 1, 1]), np.array([0, 1, -1])])
 @pytest.mark.parametrize("column_groups", [None, np.array([0, 1, 1])])
 def test_iw_transformer_zero_column(prior_strength, target, column_groups):
     IWT = InformationWeightTransformer(
@@ -227,7 +227,7 @@ def test_iw_transformer_zero_column(prior_strength, target, column_groups):
 
 
 @pytest.mark.parametrize("prior_strength", [0, 0.1])
-@pytest.mark.parametrize("target", [None, np.array([0, 1, 1])])
+@pytest.mark.parametrize("target", [None, np.array([0, 1, 1]), np.array([0, 1, -1])])
 @pytest.mark.parametrize("column_groups", [None, np.array([0, 1, 1])])
 def test_iw_transformer_zero_row(prior_strength, target, column_groups):
     IWT = InformationWeightTransformer(

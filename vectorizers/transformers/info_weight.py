@@ -1,6 +1,7 @@
 import numba
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.utils.validation import validate_data
 import scipy.sparse
 
 from warnings import warn
@@ -295,8 +296,11 @@ class InformationWeightTransformer(BaseEstimator, TransformerMixin):
         self:
             The trained model.
         """
-        if not scipy.sparse.isspmatrix(X):
-            X = scipy.sparse.csc_matrix(X)
+        # Not nice but validate_data does not return y if it is None
+        if y is not None:
+            X, y = validate_data(self, X, y, accept_sparse=True)
+        else:
+            X = validate_data(self, X, accept_sparse=True)
 
         self.information_weights_ = information_weight(
             X,
@@ -317,17 +321,35 @@ class InformationWeightTransformer(BaseEstimator, TransformerMixin):
             unsupervised_power = (1.0 - self.supervision_weight) * self.weight_power
             supervised_power = self.supervision_weight * self.weight_power
 
-            target_classes = np.unique(y)
-            target_dict = dict(
-                np.vstack((target_classes, np.arange(target_classes.shape[0]))).T
-            )
-            target = np.array(
-                [np.int64(target_dict[label]) for label in y], dtype=np.int64
-            )
+            # Format y as array of ints if it is not
+            if np.issubdtype(y.dtype, np.number) and not np.issubdtype(
+                y.dtype, np.integer
+            ):
+                cast_y = y.astype(int)
+                if np.all(y == cast_y):
+                    warn(
+                        f"Input y was cast from {y.dtype} to {cast_y.dtype} and will be treated"
+                        "as array of ints. Consider passing y as an array of ints.",
+                        UserWarning,
+                    )
+                    y = cast_y
+                else:
+                    warn(
+                        f"Input y could not be cast from {y.dtype} to {cast_y.dtype} and will be"
+                        "treated as array of objects (identical values have the same class).",
+                        UserWarning,
+                    )
+            if not np.issubdtype(y.dtype, np.integer):
+                target_classes = np.unique(y)
+                target_dict = {
+                    target_classes[i]: i for i in range(target_classes.shape[0])
+                }
+                y = np.array([target_dict[label] for label in y], dtype=np.int64)
+
             self.supervised_weights_ = information_weight(
                 X,
                 self.prior_strength,
-                target=target,
+                target=y,
                 column_groups=column_groups,
             )
             mean_supervised_weight = np.mean(self.information_weights_)
