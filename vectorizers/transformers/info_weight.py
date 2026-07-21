@@ -35,6 +35,27 @@ def column_kl_divergence(
 
 
 @numba.njit(nogil=True)
+def column_kl_divergence_zero_prior(
+    count_indices,
+    count_data,
+    baseline_probabilities,
+    mock_prior,
+    mock_zero_count_contribution,
+    target=MOCK_TARGET,
+):
+    count_norm = count_data.sum()
+    # Empty column
+    if count_norm == 0:
+        return 0
+    result = 0.0
+    current_idx = 0
+    for idx, count in zip(count_indices, count_data):
+        observed_probability = count / count_norm
+        result += observed_probability * np.log(observed_probability / baseline_probabilities[idx])
+    return result
+
+
+@numba.njit(nogil=True)
 def supervised_column_kl_divergence(
     count_indices,
     count_data,
@@ -172,6 +193,8 @@ def information_weight(
     """
     if target is not None:
         column_kl_divergence_func = supervised_column_kl_divergence
+    elif prior_strength == 0:
+        column_kl_divergence_func = column_kl_divergence_zero_prior
     else:
         column_kl_divergence_func = column_kl_divergence
 
