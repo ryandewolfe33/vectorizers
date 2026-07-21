@@ -15,6 +15,7 @@ def column_kl_divergence(
     count_data,
     baseline_probabilities,
     prior_strength,
+    zero_count_contribution,
     target=MOCK_TARGET,
 ):
     count_norm = count_data.sum()
@@ -24,12 +25,12 @@ def column_kl_divergence(
     result = 0.0
     current_idx = 0
     for i in range(baseline_probabilities.shape[0]):
-        observed_probability = prior_strength * baseline_probabilities[i]
         if count_indices[current_idx] == i:
-            observed_probability += (1-prior_strength) * count_data[current_idx] / count_norm
-            current_idx += 1
-        if observed_probability > 0:
+            observed_probability = prior_strength * baseline_probabilities[i] + (1-prior_strength) * count_data[current_idx] / count_norm
             result += observed_probability * np.log(observed_probability / baseline_probabilities[i])
+            current_idx += 1
+        else:
+            result += prior_strength * baseline_probabilities[i] * zero_count_contribution
     return result
 
 
@@ -39,6 +40,7 @@ def supervised_column_kl_divergence(
     count_data,
     baseline_probabilities,
     prior_strength,
+    zero_count_contribution,
     target,
 ):
     observed = np.zeros_like(baseline_probabilities)
@@ -50,8 +52,10 @@ def supervised_column_kl_divergence(
     observed_norm = observed.sum()
     result = 0.0
     for i in range(baseline_probabilities.shape[0]):
-        observed_probability = (1-prior_strength) * observed[i] / observed_norm + prior_strength * baseline_probabilities[i]
-        if observed_probability > 0:
+        if observed[i] == 0:
+            result += prior_strength * baseline_probabilities[i] * zero_count_contribution 
+        else:
+            observed_probability = (1-prior_strength) * observed[i] / observed_norm + prior_strength * baseline_probabilities[i]
             result += observed_probability * np.log(observed_probability / baseline_probabilities[i])
     return result
 
@@ -67,6 +71,7 @@ def column_weights(
     target=MOCK_TARGET,
     column_groups=None,
 ):
+    zero_count_contribution = np.log(prior_strength) if prior_strength > 0 else 0
     n_cols = indptr.shape[0] - 1
     weights = np.ones(n_cols)
     for i in numba.prange(n_cols):
@@ -77,7 +82,8 @@ def column_weights(
             indices[indptr[i] : indptr[i + 1]],
             data[indptr[i] : indptr[i + 1]],
             baseline_probabilities[group, :],
-            prior_strength=prior_strength,
+            prior_strength,
+            zero_count_contribution,
             target=target,
         )
     return weights
