@@ -26,11 +26,18 @@ def column_kl_divergence(
     current_idx = 0
     for i in range(baseline_probabilities.shape[0]):
         if count_indices[current_idx] == i:
-            observed_probability = prior_strength * baseline_probabilities[i] + (1-prior_strength) * count_data[current_idx] / count_norm
-            result += observed_probability * np.log(observed_probability / baseline_probabilities[i])
+            observed_probability = (
+                prior_strength * baseline_probabilities[i]
+                + (1 - prior_strength) * count_data[current_idx] / count_norm
+            )
+            result += observed_probability * np.log(
+                observed_probability / baseline_probabilities[i]
+            )
             current_idx += 1
         else:
-            result += prior_strength * baseline_probabilities[i] * zero_count_contribution
+            result += (
+                prior_strength * baseline_probabilities[i] * zero_count_contribution
+            )
     return result
 
 
@@ -51,7 +58,9 @@ def column_kl_divergence_zero_prior(
     current_idx = 0
     for idx, count in zip(count_indices, count_data):
         observed_probability = count / count_norm
-        result += observed_probability * np.log(observed_probability / baseline_probabilities[idx])
+        result += observed_probability * np.log(
+            observed_probability / baseline_probabilities[idx]
+        )
     return result
 
 
@@ -74,10 +83,16 @@ def supervised_column_kl_divergence(
     result = 0.0
     for i in range(baseline_probabilities.shape[0]):
         if observed[i] == 0:
-            result += prior_strength * baseline_probabilities[i] * zero_count_contribution 
+            result += (
+                prior_strength * baseline_probabilities[i] * zero_count_contribution
+            )
         else:
-            observed_probability = (1-prior_strength) * observed[i] / observed_norm + prior_strength * baseline_probabilities[i]
-            result += observed_probability * np.log(observed_probability / baseline_probabilities[i])
+            observed_probability = (1 - prior_strength) * observed[
+                i
+            ] / observed_norm + prior_strength * baseline_probabilities[i]
+            result += observed_probability * np.log(
+                observed_probability / baseline_probabilities[i]
+            )
     return result
 
 
