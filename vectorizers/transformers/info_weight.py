@@ -177,7 +177,7 @@ def information_weight(
     computed as the KL-divergence between distributions. For the baseline model
     we assume data will be distributed according to the row sums -- i.e.
     proportional to the frequency of the row. For the observed counts we use
-    a background prior of pseudo counts equal to ``prior_strength`` times the
+    a background prior equal to ``prior_strength`` times the
     baseline prior distribution.
 
     Parameters
@@ -193,8 +193,10 @@ def information_weight(
 
     target: ndarray or None (optional, default=None)
         If supervised target labels are available, these can be used to define distributions
-        over the target classes rather than over rows, allowing weights to be
-        supervised and target based. If None then unsupervised weighting is used.
+        over the target classes rather than over rows, allowing weights to be supervised and
+        target based. Allows negative values to denote unknown labels for semi-supervised
+        weights. If None then unsupervised weighting is used (equivalent to each sample having)
+        its own label).
 
     column_groups: ndarray or None (optional, default=None)
         If columns have a natural grouping, i.e. cols 10-15 are a one-hot-encoding of a single
@@ -290,6 +292,12 @@ class InformationWeightTransformer(BaseEstimator, TransformerMixin):
         X: ndarray of scipy sparse matrix of shape (n_samples, n_features)
             The count data to be trained on. Note that, as count data all
             entries should be positive or zero.
+
+        y: ndarray or list of shape (n_samples, )
+            Class of each sample for supervised or semi-supervised transform.
+            For semi-supervised, the element types must be convertable to ints
+            and negative numbers represent no class. If the element type is not
+            cannot be converted to int, each unique value is a class.
 
         Returns
         -------
