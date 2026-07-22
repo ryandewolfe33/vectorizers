@@ -268,10 +268,10 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
 
     def __init__(
         self,
-        prior_strength=1e-4,
-        approx_prior=None,
-        weight_power=2.0,
-        supervision_weight=0.95,
+        prior_strength:float = 1e-4,
+        approx_prior:None = None,
+        weight_power:float = 2.0,
+        supervision_weight:float = 0.95,
     ):
         self.prior_strength = prior_strength
         self.weight_power = weight_power
@@ -283,11 +283,18 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
                 "for backwards compatibility.",
                 DeprecationWarning
             )
+    
+    def _validate_parameters(self):
+        if self.prior_strength < 0 or self.prior_strength >= 1:
+            raise ValueError("prior_strength must be at least 0 and less than 1.")
+        if self.weight_power <= 0:
+            raise ValueError("weight_power must be positive.")
+        if self.supervision_weight <= 0 or self.supervision_weight > 1:
+            raise ValueError("supervision_weight must be greater than 0 and at most 1.")
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
         tags.estimator_type = "transformer"
-        tags.array_api_support = True
         tags.input_tags.sparse = True
         tags.input_tags.positive_only = True
         tags.target_tags.one_d_labels = True
@@ -305,7 +312,7 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
         }
         return (x_validation, y_validation)
 
-    def fit(self, X, y=None, column_groups=None, **fit_kwds):
+    def fit(self, X, y=None, column_groups=None):
         """Learn the appropriate column weighting as information weights
         from the observed count data ``X``.
 
@@ -326,12 +333,20 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
         self:
             The trained model.
         """
+        self._validate_parameters()
         # Not nice but validate_data does not return y if it is None
         if y is not None:
             X, y = validate_data(self, X, y, validate_separately=self._validation_kwargs(include_y=True))
         else:
             X = validate_data(self, X, **self._validation_kwargs())
         X = scipy.sparse.csr_array(X)
+
+        # Validate column groups
+        if column_groups is not None:
+            if len(column_groups) != X.shape[1]:
+                raise ValueError("The number of columns must match the length of column groups.")
+            # Make column_groups indexed with ints 0-n
+            _, column_groups = np.unique(column_groups, return_inverse=True)
 
         self.information_weights_ = information_weight(
             X,

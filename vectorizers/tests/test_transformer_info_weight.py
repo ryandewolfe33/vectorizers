@@ -14,6 +14,13 @@ test_matrix_zero_column.eliminate_zeros()
 
 
 @pytest.mark.parametrize("prior_strength", [0, 0.1])
+@pytest.mark.filterwarnings("ignore::DeprecationWarning", "ignore::UserWarning")
+def test_iw_transformer_sklearn_check_estimator(prior_strength):
+    IWT = InformationWeightTransformer(prior_strength=prior_strength)
+    check_estimator(IWT)
+
+
+@pytest.mark.parametrize("prior_strength", [0, 0.1])
 def test_iw_transformer(prior_strength):
     IWT = InformationWeightTransformer(
         prior_strength=prior_strength,
@@ -65,9 +72,41 @@ def test_iw_transformer_zero_row(prior_strength, target, column_groups):
     transform = IWT.transform(test_matrix_zero_row)
     assert np.allclose(result.toarray(), transform.toarray())
     assert np.all(IWT.information_weights_ >= 0)
-
-@pytest.mark.parametrize("prior_strength", [0, 0.1])
-def test_sklearn_check_estimator(prior_strength):
-    IWT = InformationWeightTransformer(prior_strength=prior_strength)
-    check_estimator(IWT)
     
+
+def test_iw_transformer_negative_prior_strength():
+    IWT = InformationWeightTransformer(prior_strength = -1)
+    with pytest.raises(ValueError):
+        IWT.fit(test_matrix)
+
+
+def test_iw_transformer_too_large_prior_strength():
+    IWT = InformationWeightTransformer(prior_strength = 1)
+    with pytest.raises(ValueError):
+        IWT.fit(test_matrix)
+
+
+def test_iw_transformer_zero_weight_power():
+    IWT = InformationWeightTransformer(weight_power = 0)
+    with pytest.raises(ValueError):
+        IWT.fit(test_matrix)
+
+
+def test_iw_transformer_zero_supervision_weight():
+    IWT = InformationWeightTransformer(supervision_weight = 0)
+    with pytest.raises(ValueError):
+        IWT.fit(test_matrix)
+
+
+def test_iw_transformer_too_large_supervision_weight():
+    IWT = InformationWeightTransformer(supervision_weight = 2)
+    with pytest.raises(ValueError):
+        IWT.fit(test_matrix)
+
+
+def test_iw_transformer_incorrect_column_groups():
+    IWT = InformationWeightTransformer()
+    with pytest.raises(ValueError):
+        IWT.fit(test_matrix, column_groups=np.array([0,1]))
+    with pytest.raises(ValueError):
+        IWT.fit(test_matrix, column_groups=np.array([0,0,1,1]))
