@@ -268,10 +268,10 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
 
     def __init__(
         self,
-        prior_strength:float = 1e-4,
-        approx_prior:None = None,
-        weight_power:float = 2.0,
-        supervision_weight:float = 0.95,
+        prior_strength: float = 1e-4,
+        approx_prior: None = None,
+        weight_power: float = 2.0,
+        supervision_weight: float = 0.95,
     ):
         self.prior_strength = prior_strength
         self.weight_power = weight_power
@@ -281,9 +281,9 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
             warn(
                 "Approx prior parameter is no longer used, and is only accepted"
                 "for backwards compatibility.",
-                DeprecationWarning
+                DeprecationWarning,
             )
-    
+
     def _validate_parameters(self):
         if self.prior_strength < 0 or self.prior_strength >= 1:
             raise ValueError("prior_strength must be at least 0 and less than 1.")
@@ -299,17 +299,12 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
         tags.input_tags.positive_only = True
         tags.target_tags.one_d_labels = True
         return tags
-    
+
     def _validation_kwargs(self, include_y=False):
-        x_validation = {
-            "accept_sparse": True,
-            "ensure_non_negative": True
-        }
+        x_validation = {"accept_sparse": True, "ensure_non_negative": True}
         if not include_y:
             return x_validation
-        y_validation = {
-            "ensure_2d": False
-        }
+        y_validation = {"ensure_2d": False}
         return (x_validation, y_validation)
 
     def fit(self, X, y=None, column_groups=None):
@@ -336,7 +331,9 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
         self._validate_parameters()
         # Not nice but validate_data does not return y if it is None
         if y is not None:
-            X, y = validate_data(self, X, y, validate_separately=self._validation_kwargs(include_y=True))
+            X, y = validate_data(
+                self, X, y, validate_separately=self._validation_kwargs(include_y=True)
+            )
         else:
             X = validate_data(self, X, **self._validation_kwargs())
         X = scipy.sparse.csr_array(X)
@@ -344,7 +341,9 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
         # Validate column groups
         if column_groups is not None:
             if len(column_groups) != X.shape[1]:
-                raise ValueError("The number of columns must match the length of column groups.")
+                raise ValueError(
+                    "The number of columns must match the length of column groups."
+                )
             # Make column_groups indexed with ints 0-n
             _, column_groups = np.unique(column_groups, return_inverse=True)
 
