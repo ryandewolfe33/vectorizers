@@ -241,7 +241,7 @@ def information_weight(
     return weights
 
 
-class InformationWeightTransformer(BaseEstimator, TransformerMixin):
+class InformationWeightTransformer(TransformerMixin, BaseEstimator):
     """A data transformer that re-weights columns of count data. Column weights
     are computed as information based weights for columns. The information weight
     is estimated as the amount of information gained by moving from a baseline
@@ -276,12 +276,21 @@ class InformationWeightTransformer(BaseEstimator, TransformerMixin):
         self.prior_strength = prior_strength
         self.weight_power = weight_power
         self.supervision_weight = supervision_weight
-
+        self.approx_prior = approx_prior
         if approx_prior is not None:
             warn(
                 "Approx prior parameter is no longer used, and is only accepted"
                 "for backwards compatibility."
             )
+
+    def __sklearn_tags__(self):
+        # Expose public tags
+        tags = super().__sklearn_tags__()
+        tags.estimator_type = "transformer"
+        tags.input_tags.sparse = True
+        tags.input_tags.positive_only = True
+        tags.target_tags.one_d_labels = True
+        return tags
 
     def fit(self, X, y=None, column_groups=None, **fit_kwds):
         """Learn the appropriate column weighting as information weights
@@ -305,10 +314,18 @@ class InformationWeightTransformer(BaseEstimator, TransformerMixin):
             The trained model.
         """
         # Not nice but validate_data does not return y if it is None
+        x_validation = {
+            "accept_sparse": True,
+            "ensure_non_negative": True
+        }
         if y is not None:
-            X, y = validate_data(self, X, y, accept_sparse=True)
+            y_validation = {
+                "ensure_2d": False
+            }
+            X, y = validate_data(self, X, y, validate_separately=(x_validation, y_validation))
         else:
-            X = validate_data(self, X, accept_sparse=True)
+            X = validate_data(self, X, **x_validation)
+        X = scipy.sparse.csr_array(X)
 
         self.information_weights_ = information_weight(
             X,
@@ -389,5 +406,6 @@ class InformationWeightTransformer(BaseEstimator, TransformerMixin):
         result: ndarray of scipy sparse matrix of shape (n_samples, n_features)
             The reweighted data.
         """
+        X = validate_data(self, X, accept_sparse=True, ensure_non_negative=True, reset=False)
         result = X @ scipy.sparse.diags(self.information_weights_)
         return result
