@@ -31,7 +31,7 @@ def column_kl_divergence(
                 prior_strength * baseline_probabilities[i]
                 + (1 - prior_strength) * count_data[current_idx] / count_norm
             )
-            result += observed_probability * np.log(
+            result += observed_probability * np.log2(
                 observed_probability / baseline_probabilities[i]
             )
             current_idx += 1
@@ -59,7 +59,7 @@ def column_kl_divergence_zero_prior(
     current_idx = 0
     for idx, count in zip(count_indices, count_data):
         observed_probability = count / count_norm
-        result += observed_probability * np.log(
+        result += observed_probability * np.log2(
             observed_probability / baseline_probabilities[idx]
         )
     return result
@@ -81,6 +81,8 @@ def supervised_column_kl_divergence(
         if label >= 0:
             observed[label] += count_data[i]
     observed_norm = observed.sum()
+    if observed_norm == 0:
+        return 0
     result = 0.0
     for i in range(baseline_probabilities.shape[0]):
         if observed[i] == 0:
@@ -91,7 +93,7 @@ def supervised_column_kl_divergence(
             observed_probability = (1 - prior_strength) * observed[
                 i
             ] / observed_norm + prior_strength * baseline_probabilities[i]
-            result += observed_probability * np.log(
+            result += observed_probability * np.log2(
                 observed_probability / baseline_probabilities[i]
             )
     return result
@@ -108,7 +110,7 @@ def column_weights(
     target=MOCK_TARGET,
     column_groups=None,
 ):
-    zero_count_contribution = np.log(prior_strength) if prior_strength > 0 else 0
+    zero_count_contribution = np.log2(prior_strength) if prior_strength > 0 else 0
     n_cols = indptr.shape[0] - 1
     weights = np.ones(n_cols)
     for i in numba.prange(n_cols):
@@ -167,7 +169,7 @@ def compute_baseline_probabilities(
 
 def information_weight(
     data,
-    prior_strength=0.1,
+    prior_strength=1e-4,
     target=None,
     column_groups=None,
 ):
@@ -270,7 +272,7 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
         self,
         prior_strength: float = 1e-4,
         approx_prior: None = None,
-        weight_power: float = 2.0,
+        weight_power: float = 1.0,
         supervision_weight: float = 0.95,
     ):
         self.prior_strength = prior_strength
@@ -353,19 +355,8 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
             column_groups=column_groups,
         )
 
-        mean_weight = np.mean(self.information_weights_)
-        if mean_weight > 0:
-            self.information_weights_ /= mean_weight
-            # This should never happen
-        self.information_weights_ = np.maximum(self.information_weights_, 0.0)
-        self.information_weights_ = np.power(
-            self.information_weights_, self.weight_power
-        )
-
         if y is not None:
-            unsupervised_power = (1.0 - self.supervision_weight) * self.weight_power
-            supervised_power = self.supervision_weight * self.weight_power
-
+            self.unsupervised_weights_ = self.information_weights_
             # Format y as array of ints if it is not
             if np.issubdtype(y.dtype, np.number) and not np.issubdtype(
                 y.dtype, np.integer
@@ -397,18 +388,18 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
                 target=y,
                 column_groups=column_groups,
             )
-            mean_supervised_weight = np.mean(self.information_weights_)
-            if mean_supervised_weight > 0:
-                self.supervised_weights_ /= mean_supervised_weight
-            # This should never happen
-            self.supervised_weights_ = np.maximum(self.supervised_weights_, 0.0)
-            self.supervised_weights_ = np.power(
-                self.supervised_weights_, supervised_power
-            )
+
+            unsupervised_power = (1.0 - self.supervision_weight) * self.weight_power
+            supervised_power = self.supervision_weight * self.weight_power
 
             self.information_weights_ = (
-                self.information_weights_ * self.supervised_weights_
+                np.power(self.unsupervised_weights_, unsupervised_power) *
+                np.power(self.supervised_weights_, supervised_power)
             )
+        
+        self.information_weights_ = np.power(
+            self.information_weights_, self.weight_power
+        )
 
         return self
 
