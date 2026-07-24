@@ -306,7 +306,7 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
         x_validation = {"accept_sparse": True, "ensure_non_negative": True}
         if not include_y:
             return x_validation
-        y_validation = {"ensure_2d": False}
+        y_validation = {"ensure_2d": False, "dtype": None}
         return (x_validation, y_validation)
 
     def fit(self, X, y=None, column_groups=None):
