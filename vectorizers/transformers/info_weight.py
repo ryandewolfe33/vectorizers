@@ -389,8 +389,8 @@ class InformationWeightTransformer(TransformerMixin, BaseEstimator):
                 column_groups=column_groups,
             )
 
-            unsupervised_power = (1.0 - self.supervision_weight) * self.weight_power
-            supervised_power = self.supervision_weight * self.weight_power
+            unsupervised_power = (1.0 - self.supervision_weight)
+            supervised_power = self.supervision_weight
 
             self.information_weights_ = (
                 np.power(self.unsupervised_weights_, unsupervised_power) *
